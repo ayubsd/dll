@@ -1,0 +1,63 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+
+NUM_WORDS = 10000  # use top 10k words
+(train_data, train_labels), (test_data, test_labels) = keras.datasets.reuters.load_data(num_words=NUM_WORDS)
+
+
+def vectorize(sequences, dimension=NUM_WORDS):
+    results = np.zeros((len(sequences), dimension))
+    for i, seq in enumerate(sequences):
+        results[i, seq] = 1.0
+    return results
+
+x_train = vectorize(train_data)
+x_test = vectorize(test_data)
+model = keras.Sequential([
+    layers.Dense(64, activation="relu", input_shape=(NUM_WORDS,)),
+    layers.Dense(46, activation="softmax")   # 46 classes in Reuters
+])
+
+model.compile(
+    optimizer="rmsprop",
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"]
+)
+model.summary()
+
+
+
+history = model.fit(
+    x_train, train_labels,
+    epochs=10,
+    batch_size=512,
+    validation_split=0.2,
+    verbose=2
+)
+test_loss, test_acc = model.evaluate(x_test, test_labels)
+print("Test Accuracy:", test_acc)
+
+sample_index = 0
+
+sample = x_test[sample_index].reshape(1, -1)
+pred = model.predict(sample)
+
+predicted_class = np.argmax(pred)
+actual_class = test_labels[sample_index]
+
+print("Predicted class:", predicted_class)
+print("Actual class:", actual_class)
+word_index = keras.datasets.reuters.get_word_index()
+reverse_word_index = {value: key for key, value in word_index.items()}
+
+def decode_newswire(sequence):
+    return " ".join(reverse_word_index.get(i - 3, "?") for i in sequence)
+
+print("\nNEWSWIRE TEXT:\n")
+print(decode_newswire(test_data[sample_index]))
+
+
+
