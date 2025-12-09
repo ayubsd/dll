@@ -1,0 +1,61 @@
+import tensorflow as tf
+
+(train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
+
+def preprocess(image, label):
+    # Add channel dim: (28,28) -> (28,28,1)
+    image = tf.expand_dims(image, -1)
+
+    # Convert to RGB
+    image = tf.image.grayscale_to_rgb(image)
+
+    # Resize to 224
+    image = tf.image.resize(image, (224, 224))
+
+    # Normalize 0-1
+    image = tf.cast(image, tf.float32) / 255.0
+
+    return image, label
+BATCH_SIZE = 32
+
+train_ds = (
+    tf.data.Dataset.from_tensor_slices((train_images, train_labels))
+    .shuffle(60000)
+    .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    .batch(BATCH_SIZE)
+    .prefetch(tf.data.AUTOTUNE)
+)
+
+test_ds = (
+    tf.data.Dataset.from_tensor_slices((test_images, test_labels))
+    .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    .batch(BATCH_SIZE)
+    .prefetch(tf.data.AUTOTUNE)
+)
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras import layers, models
+
+base = MobileNetV2(
+    weights="imagenet",
+    include_top=False,
+    input_shape=(224, 224, 3)
+)
+base.trainable = False
+model = models.Sequential([
+    base,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.3),
+    layers.Dense(10, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+history = model.fit(
+    train_ds,
+    epochs=5,
+    validation_data=test_ds
+)
