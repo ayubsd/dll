@@ -1,0 +1,93 @@
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+import matplotlib.pyplot as plt
+import numpy as np
+
+# --- 1. Load and Preprocess the Data ---
+
+# Load the MNIST dataset
+(x_train, _), (x_test, _) = tf.keras.datasets.mnist.load_data()
+
+# Normalize pixel values from 0-255 to 0-1
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+
+# Flatten the 28x28 images into 784-dimensional vectors
+original_dim = 784
+x_train = x_train.reshape((len(x_train), original_dim))
+x_test = x_test.reshape((len(x_test), original_dim))
+# --- 2. Define the Autoencoder Architecture ---
+
+# This is the size of our compressed code (the bottleneck)
+# 784 pixels -> 32 numbers (a 24.5x compression)
+encoding_dim = 32
+
+# Input placeholder
+input_img = Input(shape=(original_dim,))
+
+# --- Encoder ---
+# This part of the model learns to compress the input
+# h = f(x)
+encoded = Dense(128, activation='relu')(input_img)
+encoded = Dense(64, activation='relu')(encoded)
+encoded = Dense(encoding_dim, activation='relu', name='encoder_output')(encoded)
+
+# --- Decoder ---
+# This part of the model learns to reconstruct the image from the code
+# r = g(h)
+decoded = Dense(64, activation='relu')(encoded)
+decoded = Dense(128, activation='relu')(decoded)
+# The output layer must have the same dimension as the input (784)
+# We use 'sigmoid' because our input pixels are in the [0, 1] range
+decoded = Dense(original_dim, activation='sigmoid')(decoded)
+
+# This model maps an input to its reconstruction
+autoencoder = Model(input_img, decoded)
+# --- 3. Compile the Model ---
+
+# We train the model to minimize the mean squared error
+# between the original image (x) and the reconstruction (r)
+autoencoder.compile(optimizer='adam', loss='mean_squared_error')
+autoencoder.summary()
+
+# --- 4. Train the Model ---
+
+print("Training the autoencoder...")
+# Note: We train the model to predict its own input (x_train -> x_train)
+autoencoder.fit(x_train, x_train,
+                epochs=20,
+                batch_size=256,
+                shuffle=True,
+                validation_data=(x_test, x_test))
+# --- 5. Visualize the Results ---
+
+# Predict on the test set to get the reconstructions
+decoded_imgs = autoencoder.predict(x_test)
+
+# Set up the plot
+n = 10  # Number of digits to display
+plt.figure(figsize=(20, 4))
+plt.suptitle("Autoencoder Compression Results (784px -> 32 numbers -> 784px)", fontsize=16)
+
+for i in range(n):
+    # --- Display original images ---
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i].reshape(28, 28))
+    plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    if i == 0:
+        ax.set_title("Original Images", fontsize=12)
+
+    # --- Display reconstructed images ---
+    ax = plt.subplot(2, n, i + 1 + n)
+    plt.imshow(decoded_imgs[i].reshape(28, 28))
+    plt.gray()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    if i == 0:
+        ax.set_title("Reconstructed Images", fontsize=12)
+
+plt.show()image 
+
